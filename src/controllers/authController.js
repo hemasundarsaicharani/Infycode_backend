@@ -1,36 +1,23 @@
-import db from "../config/firebase.js";
-import bcrypt from "bcryptjs";
-import generateToken from "../utils/generateToken.js";
-
-const studentsRef = db.ref("students");
-const adminsRef = db.ref("admins");
-
+import * as authService from "../services/authService.js";
+import { hashPassword, comparePassword } from "../utils/hash.js";
+import { generateToken } from "../utils/token.js";
 
 // ✅ STUDENT REGISTER
 export const studentRegister = async (req, res) => {
   try {
     const { username, email, password } = req.body;
 
-    const snapshot = await studentsRef
-      .orderByChild("username")
-      .equalTo(username)
-      .once("value");
-
-    if (snapshot.exists()) {
+    const existingUser = await authService.findUserByUsername("student", username);
+    if (existingUser) {
       return res.status(400).json({ message: "User already exists" });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const newUserRef = studentsRef.push();
-
-    await newUserRef.set({
+    const hashedPassword = await hashPassword(password);
+    
+    await authService.createStudent({
       username,
       email,
-      password: hashedPassword,
-      role: "student",
-      status: "Pending",
-      createdAt: new Date().toISOString()
+      password: hashedPassword
     });
 
     res.status(201).json({ message: "Student registered successfully" });
@@ -40,29 +27,21 @@ export const studentRegister = async (req, res) => {
   }
 };
 
-
 // ✅ STUDENT LOGIN
 export const studentLogin = async (req, res) => {
   try {
     const { username, password } = req.body;
 
-    const snapshot = await studentsRef
-      .orderByChild("username")
-      .equalTo(username)
-      .once("value");
+    const userData = await authService.findUserByUsername("student", username);
 
-    if (!snapshot.exists()) {
-      return res.status(400).json({ message: "Debug: User not found in database (Check exact spelling/case of username)" });
+    if (!userData) {
+      return res.status(400).json({ message: "User not found" });
     }
 
-    let userData;
-    snapshot.forEach(child => userData = child.val());
+    const isMatch = await comparePassword(password, userData.password);
 
-    const isMatch = await bcrypt.compare(password, userData.password);
-    const isPlainTextMatch = password === userData.password; // Fallback for manual Firebase plain-text entries
-
-    if (!isMatch && !isPlainTextMatch) {
-      return res.status(400).json({ message: "Debug: User found, but Password does not match" });
+    if (!isMatch) {
+      return res.status(400).json({ message: "Invalid credentials" });
     }
 
     const token = generateToken(userData);
@@ -78,28 +57,20 @@ export const studentLogin = async (req, res) => {
   }
 };
 
-
 // ✅ ADMIN LOGIN
 export const adminLogin = async (req, res) => {
   try {
     const { username, password } = req.body;
 
-    const snapshot = await adminsRef
-      .orderByChild("username")
-      .equalTo(username)
-      .once("value");
+    const userData = await authService.findUserByUsername("admin", username);
 
-    if (!snapshot.exists()) {
+    if (!userData) {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    let userData;
-    snapshot.forEach(child => userData = child.val());
+    const isMatch = await comparePassword(password, userData.password);
 
-    const isMatch = await bcrypt.compare(password, userData.password);
-    const isPlainTextMatch = password === userData.password; // Fallback for manual Firebase plain-text entries
-
-    if (!isMatch && !isPlainTextMatch) {
+    if (!isMatch) {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 

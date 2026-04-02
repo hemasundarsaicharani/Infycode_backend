@@ -11,7 +11,7 @@ import {
   verifyToken,
   isAdmin,
   isStudent
-} from "../middleware/authMiddleware.js";
+} from "../middlewares/authMiddleware.js";
 
 // STUDENT
 router.post("/student/register", studentRegister);

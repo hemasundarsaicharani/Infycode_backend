@@ -1,4 +1,4 @@
-import db from "../config/firebase.js";
+import db from "../config/firebaseAdmin.js";
 
 const studentsRef = db.ref("students");
 const trainersRef = db.ref("trainers");
